@@ -41,13 +41,6 @@ impl Error {
             })),
         }
     }
-
-    // pub fn kind(&self) -> ErrorKind {
-    //     match self.repr {
-    //         Repr::Simple(kind) => kind,
-    //         Repr::Custom(ref c) => c.kind,
-    //     }
-    // }
 }
 
 impl ErrorKind {
@@ -92,15 +85,6 @@ impl fmt::Display for Error {
         }
     }
 }
-
-// impl error::Error for Error {
-//     fn description(&self) -> &str {
-//         match self.repr {
-//             Repr::Simple(..) => self.kind().as_str(),
-//             Repr::Custom(ref c) => c.error.description(),
-//         }
-//     }
-// }
 
 impl std::convert::From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
