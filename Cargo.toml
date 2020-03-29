@@ -1,0 +1,19 @@
+[package]
+name = "regreddit"
+version = "0.1.0"
+authors = ["Yage Hu <yagehu@qq.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = "2.33.0"
+config = "0.10.1"
+log = "0.4.8"
+log4rs = "0.11.0"
+reqwest = { version = "0.10.4", features = ["json"] }
+serde = "1.0.105"
+serde_derive = "1.0.105"
+serde_json = "1.0.50"
+tokio = "0.2.13"
+url = { version = "2.1.1", features = ["serde"] }
