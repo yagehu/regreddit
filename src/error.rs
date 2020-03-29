@@ -1,6 +1,5 @@
 use std::error;
 use std::fmt;
-use std::intrinsics::write_bytes;
 use std::result;
 
 pub type Result<T> = result::Result<T, Error>;
@@ -27,6 +26,7 @@ pub enum ErrorKind {
     InvalidInput,
     Network,
     Reddit,
+    Io,
 }
 
 impl Error {
@@ -57,6 +57,7 @@ impl ErrorKind {
             ErrorKind::InvalidInput => "invalid input",
             ErrorKind::Network => "network error",
             ErrorKind::Reddit => "Reddit error",
+            ErrorKind::Io => "I/O error",
         }
     }
 }
@@ -100,3 +101,9 @@ impl fmt::Display for Error {
 //         }
 //     }
 // }
+
+impl std::convert::From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Self {
+        Error::new(ErrorKind::Io, err)
+    }
+}

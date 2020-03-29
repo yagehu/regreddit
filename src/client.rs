@@ -132,13 +132,15 @@ impl Client for ClientImpl {
                             subreddit,
                             title,
                             kind: "link".to_string(),
-                            url: url.to_string(),
+                            url: Some(url.to_string()),
                             resubmit: true,
+                            text: None,
+                            richtext_json: None,
                         })
                         .send()
                         .await
                     {
-                        Ok(resp) => res = resp,
+                        Ok(r) => res = r,
                         Err(err) => {
                             return Err(error::Error::new(
                                 ErrorKind::Network,
@@ -147,47 +149,77 @@ impl Client for ClientImpl {
                         }
                     }
 
-                    if res.status() != reqwest::StatusCode::OK {
-                        log::error!(
-                            "Authentication failed with status {}.",
-                            res.status()
-                        );
-
-                        return Err(error::Error::from(ErrorKind::Reddit));
-                    }
-
-                    match res.text().await {
-                        Err(err) => {
-                            return Err(error::Error::new(
-                                ErrorKind::Network,
-                                err,
-                            ))
-                        }
-                        Ok(text) => {
-                            match serde_json::from_str::<SubmitResponse>(&text)
-                            {
-                                Ok(res) => {
-                                    if res.success == false {
-                                        return Err(error::Error::from(
-                                            ErrorKind::Reddit,
-                                        ));
-                                    }
-                                }
-                                Err(err) => {
-                                    return Err(error::Error::new(
-                                        ErrorKind::Reddit,
-                                        err,
-                                    ))
-                                }
-                            }
-                        }
-                    }
-
+                    check_submit_response(res).await?;
                     log::info!("Successfully submitted a link.");
+
                     Ok::<(), error::Error>(())
                 })?;
             }
-            _ => {}
+            reddit::Post::SelfPost {
+                subreddit,
+                title,
+                body,
+            } => {
+                let request;
+
+                match body {
+                    reddit::SelfPostBody::Text(text) => {
+                        log::info!(r#"Building a "text" self-post request..."#);
+                        request = SubmitRequest {
+                            subreddit,
+                            title,
+                            kind: "self".to_string(),
+                            url: None,
+                            resubmit: true,
+                            text: Some(text),
+                            richtext_json: None,
+                        }
+                    }
+                    reddit::SelfPostBody::RichtextJson(richtext_json) => {
+                        request = SubmitRequest {
+                            subreddit,
+                            title,
+                            kind: "self".to_string(),
+                            url: None,
+                            resubmit: true,
+                            text: None,
+                            richtext_json: Some(richtext_json),
+                        }
+                    }
+                }
+
+                rt.block_on(async {
+                    let res;
+
+                    log::info!("Making POST request to Reddit...");
+
+                    match self
+                        .http_client
+                        .post("https://oauth.reddit.com/api/submit")
+                        .header("User-Agent", &self.user_agent)
+                        .header(
+                            "Authorization",
+                            format!("Bearer {}", self.access_token),
+                        )
+                        .form(&request)
+                        .send()
+                        .await
+                    {
+                        Ok(r) => res = r,
+                        Err(err) => {
+                            return Err(error::Error::new(
+                                ErrorKind::Network,
+                                err,
+                            ))
+                        }
+                    }
+
+                    check_submit_response(res).await?;
+                    log::info!("Successfully submitted a self-post.");
+
+                    Ok(())
+                })?;
+            }
         }
 
         Ok(SubmitResult {})
@@ -214,14 +246,16 @@ pub struct SubmitParams {
 
 pub struct SubmitResult {}
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 struct SubmitRequest {
     #[serde(rename(serialize = "sr"))]
     subreddit: String,
     title: String,
     kind: String,
-    url: String,
+    url: Option<String>,
     resubmit: bool,
+    text: Option<String>,
+    richtext_json: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -232,4 +266,36 @@ struct SubmitResponse {
 #[derive(Debug, Deserialize)]
 struct GetTokenResponse {
     access_token: String,
+}
+
+async fn check_submit_response(res: reqwest::Response) -> error::Result<()> {
+    if res.status() != reqwest::StatusCode::OK {
+        log::error!("Authentication failed with status {}.", res.status());
+
+        return Err(error::Error::from(ErrorKind::Reddit));
+    }
+
+    match res.text().await {
+        Err(err) => return Err(error::Error::new(ErrorKind::Network, err)),
+        Ok(text) => {
+            log::debug!("{}", text);
+
+            match serde_json::from_str::<SubmitResponse>(&text) {
+                Ok(res) => {
+                    if !res.success {
+                        log::error!("Submit failed.");
+                        return Err(error::Error::from(ErrorKind::Reddit));
+                    }
+
+                    log::info!("Submit OK.");
+                }
+                Err(err) => {
+                    log::error!("Could not deserialize response");
+                    return Err(error::Error::new(ErrorKind::Reddit, err));
+                }
+            }
+        }
+    }
+
+    Ok(())
 }

@@ -1,6 +1,5 @@
 use url;
 
-#[derive(Deserialize, Serialize)]
 pub enum Post {
     Link {
         subreddit: String,
@@ -10,5 +9,11 @@ pub enum Post {
     SelfPost {
         subreddit: String,
         title: String,
+        body: SelfPostBody,
     },
+}
+
+pub enum SelfPostBody {
+    Text(String),
+    RichtextJson(String),
 }

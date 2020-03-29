@@ -14,7 +14,6 @@ use clap;
 use crate::app::{App, AppImpl, Params, RegredditParams};
 use crate::client::ClientImpl;
 use crate::settings::Settings;
-use log4rs::append::console::ConsoleAppender;
 
 static NAME: &str = "regreddit";
 static VERSION: &str = "v0.1.0";
@@ -25,6 +24,7 @@ fn main() {
         .version(VERSION)
         .about("Nuke your Reddit account.")
         .author("Yage Hu <yagehu@qq.com>")
+        .setting(clap::AppSettings::SubcommandRequiredElseHelp)
         .arg(
             clap::Arg::with_name("yes")
                 .long("yes")
@@ -37,23 +37,56 @@ fn main() {
         )
         .subcommand(
             clap::SubCommand::with_name("submit")
-                .about("Submit a post.")
-                .arg(
-                    clap::Arg::with_name("type")
-                        .required(true)
-                        .possible_values(&["link", "self-post"]),
+                .about("Submit to Reddit.")
+                .setting(clap::AppSettings::SubcommandRequiredElseHelp)
+                .subcommand(
+                    clap::SubCommand::with_name("link")
+                        .about("Submit a link.")
+                        .arg(clap::Arg::with_name("subreddit").required(true))
+                        .arg(clap::Arg::with_name("title").required(true))
+                        .arg(
+                            clap::Arg::with_name("url")
+                                .help("The URL to submit.")
+                                .required(true),
+                        )
                 )
-                .arg(clap::Arg::with_name("subreddit").required(true))
-                .arg(clap::Arg::with_name("title").required(true))
-                .arg(
-                    clap::Arg::with_name("url")
-                        .long("url")
-                        .help("The URL to submit.")
-                        .required_if("type", "link")
-                        .takes_value(true),
-                ),
+                .subcommand(
+                    clap::SubCommand::with_name("self-post")
+                        .about("Submit a self-post.")
+                        .arg(clap::Arg::with_name("subreddit").required(true))
+                        .arg(clap::Arg::with_name("title").required(true))
+                        .group(
+                            clap::ArgGroup::with_name("content")
+                                .args(&["text", "text-file"])
+                                .required(true),
+                        )
+                        .arg(
+                            clap::Arg::with_name("text")
+                                .long("text")
+                                .help("The body text to submit.")
+                                .takes_value(true),
+                        )
+                        .arg(
+                            clap::Arg::with_name("text-file")
+                                .long("text-file")
+                                .help("A file containing the body text to submit.")
+                                .takes_value(true),
+                        )
+                        .arg(
+                            clap::Arg::with_name("richtext_json")
+                                .long("richtext-json")
+                                .help("The body richtext JSON data to submit.")
+                                .takes_value(true),
+                        )
+                        .arg(
+                            clap::Arg::with_name("richtext_json_file")
+                                .long("richtext-json-file")
+                                .help("A file containing richtext JSON data to submit.")
+                                .takes_value(true),
+                        ),
         )
-        .get_matches();
+    )
+    .get_matches();
 
     config_logger();
 
@@ -69,22 +102,30 @@ fn main() {
     let settings = Settings::new().unwrap();
 
     if let Some(matches) = matches.subcommand_matches("submit") {
-        let post_type = matches.value_of("type").unwrap();
-
-        if post_type == "link" {
-            match app.submit(app::SubmitParams {
+        if let Some(matches) = matches.subcommand_matches("link") {
+            match app.submit_link(app::SubmitLinkParams {
                 credentials: &settings.credentials,
-                post_type: matches.value_of("type").unwrap(),
                 subreddit: matches.value_of("subreddit").unwrap(),
                 title: matches.value_of("title").unwrap(),
-                url: matches.value_of("url"),
+                url: matches.value_of("url").unwrap(),
             }) {
                 Ok(_res) => process::exit(0),
-                Err(err) => {
-                    eprintln!("Could not post to Reddit.");
-                    eprintln!("{}", err);
-                    process::exit(1)
-                }
+                Err(_err) => process::exit(1),
+            }
+        }
+
+        if let Some(matches) = matches.subcommand_matches("self-post") {
+            match app.submit_self_post(app::SubmitSelfPostParams {
+                credentials: &settings.credentials,
+                subreddit: matches.value_of("subreddit").unwrap(),
+                title: matches.value_of("title").unwrap(),
+                text: matches.value_of("text"),
+                text_file: matches.value_of("text-file"),
+                richtext_json: matches.value_of("richtext-json"),
+                richtext_json_file: matches.value_of("richtext-json-file"),
+            }) {
+                Ok(_res) => process::exit(0),
+                Err(_err) => process::exit(1),
             }
         }
     }
@@ -118,7 +159,7 @@ fn config_logger() {
         .build(
             log4rs::config::Root::builder()
                 .appender("stderr")
-                .build(log::LevelFilter::Debug),
+                .build(log::LevelFilter::Info),
         )
         .unwrap();
     let _ = log4rs::init_config(config).unwrap();
