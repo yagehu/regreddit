@@ -51,8 +51,8 @@ impl Error {
 }
 
 impl ErrorKind {
-    pub(crate) fn as_str(&self) -> &'static str {
-        match *self {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
             ErrorKind::Authentication => "could not authenticate",
             ErrorKind::InvalidInput => "invalid input",
             ErrorKind::Network => "network error",
