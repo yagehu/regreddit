@@ -35,6 +35,12 @@ fn main() {
                 .long("username")
                 .help("The username of the Reddit account."),
         )
+        .arg(
+            clap::Arg::with_name("verbosity")
+                .short("v")
+                .help("The verbosity of logging. Can be repeated `-vvv`")
+                .multiple(true)
+        )
         .subcommand(
             clap::SubCommand::with_name("submit")
                 .about("Submit to Reddit.")
@@ -88,7 +94,7 @@ fn main() {
     )
     .get_matches();
 
-    config_logger();
+    config_logger(matches.occurrences_of("verbosity"));
 
     let mut client = ClientImpl::new(client::Params {
         user_agent: format!(
@@ -110,7 +116,10 @@ fn main() {
                 url: matches.value_of("url").unwrap(),
             }) {
                 Ok(_res) => process::exit(0),
-                Err(_err) => process::exit(1),
+                Err(err) => {
+                    eprintln!("{}", err);
+                    process::exit(1)
+                }
             }
         }
 
@@ -125,7 +134,10 @@ fn main() {
                 richtext_json_file: matches.value_of("richtext-json-file"),
             }) {
                 Ok(_res) => process::exit(0),
-                Err(_err) => process::exit(1),
+                Err(err) => {
+                    eprintln!("{}", err);
+                    process::exit(1)
+                }
             }
         }
     }
@@ -145,12 +157,24 @@ fn main() {
     }
 }
 
-fn config_logger() {
+fn config_logger(verbosity: u64) {
     let stderr = log4rs::append::console::ConsoleAppender::builder()
         .encoder(Box::new(log4rs::encode::pattern::PatternEncoder::new(
             "{d(%Y-%m-%d %H:%M:%S)} {h({l:>5})} {m}\n",
         )))
         .build();
+
+    let level_filter;
+
+    match verbosity {
+        0 => level_filter = log::LevelFilter::Off,
+        1 => level_filter = log::LevelFilter::Error,
+        2 => level_filter = log::LevelFilter::Warn,
+        3 => level_filter = log::LevelFilter::Info,
+        4 => level_filter = log::LevelFilter::Debug,
+        _ => level_filter = log::LevelFilter::Trace,
+    }
+
     let config = log4rs::config::Config::builder()
         .appender(
             log4rs::config::Appender::builder()
@@ -159,7 +183,7 @@ fn config_logger() {
         .build(
             log4rs::config::Root::builder()
                 .appender("stderr")
-                .build(log::LevelFilter::Info),
+                .build(level_filter),
         )
         .unwrap();
     let _ = log4rs::init_config(config).unwrap();

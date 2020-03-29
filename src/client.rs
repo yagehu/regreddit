@@ -3,18 +3,14 @@ use reqwest;
 use std::collections::HashMap;
 use tokio::runtime::Runtime;
 
-use crate::error;
-use crate::error::ErrorKind;
+use crate::error::{Error, ErrorKind, Result};
 use crate::reddit;
 use crate::settings;
 
 pub trait Client {
-    fn basic_auth(
-        &mut self,
-        p: BasicAuthParams,
-    ) -> error::Result<BasicAuthResult>;
-    fn get_posts(&self, p: GetPostsParams) -> error::Result<GetPostsResult>;
-    fn submit(&self, p: SubmitParams) -> error::Result<SubmitResult>;
+    fn basic_auth(&mut self, p: BasicAuthParams) -> Result<BasicAuthResult>;
+    fn get_posts(&self, p: GetPostsParams) -> Result<GetPostsResult>;
+    fn submit(&self, p: SubmitParams) -> Result<SubmitResult>;
 }
 
 pub struct ClientImpl {
@@ -38,10 +34,7 @@ impl ClientImpl {
 }
 
 impl Client for ClientImpl {
-    fn basic_auth(
-        &mut self,
-        p: BasicAuthParams,
-    ) -> error::Result<BasicAuthResult> {
+    fn basic_auth(&mut self, p: BasicAuthParams) -> Result<BasicAuthResult> {
         let mut form = HashMap::new();
         form.insert("grant_type", "password");
         form.insert("username", &p.credentials.username);
@@ -66,10 +59,7 @@ impl Client for ClientImpl {
             {
                 Ok(resp) => res = resp,
                 Err(err) => {
-                    return Err(error::Error::new(
-                        ErrorKind::Authentication,
-                        err,
-                    ))
+                    return Err(Error::new(ErrorKind::Authentication, err))
                 }
             }
 
@@ -79,26 +69,23 @@ impl Client for ClientImpl {
                     res.status(),
                 );
 
-                return Err(error::Error::from(ErrorKind::Authentication));
+                return Err(Error::from(ErrorKind::Authentication));
             }
 
             match res.json::<GetTokenResponse>().await {
                 Ok(res) => self.access_token = res.access_token,
                 Err(err) => {
-                    return Err(error::Error::new(
-                        ErrorKind::Authentication,
-                        err,
-                    ))
+                    return Err(Error::new(ErrorKind::Authentication, err))
                 }
             }
 
-            Ok::<(), error::Error>(())
+            Ok::<(), Error>(())
         })?;
 
         Ok(BasicAuthResult {})
     }
 
-    fn get_posts(&self, p: GetPostsParams) -> error::Result<GetPostsResult> {
+    fn get_posts(&self, p: GetPostsParams) -> Result<GetPostsResult> {
         self.http_client.get(&format!(
             "https://oauth.reddit.com/user/{}/submitted",
             p.username
@@ -106,7 +93,7 @@ impl Client for ClientImpl {
         Ok(GetPostsResult {})
     }
 
-    fn submit(&self, p: SubmitParams) -> error::Result<SubmitResult> {
+    fn submit(&self, p: SubmitParams) -> Result<SubmitResult> {
         let mut rt = Runtime::new().unwrap();
 
         match p.post {
@@ -142,17 +129,14 @@ impl Client for ClientImpl {
                     {
                         Ok(r) => res = r,
                         Err(err) => {
-                            return Err(error::Error::new(
-                                ErrorKind::Network,
-                                err,
-                            ))
+                            return Err(Error::new(ErrorKind::Network, err))
                         }
                     }
 
                     check_submit_response(res).await?;
                     log::info!("Successfully submitted a link.");
 
-                    Ok::<(), error::Error>(())
+                    Ok::<(), Error>(())
                 })?;
             }
             reddit::Post::SelfPost {
@@ -207,10 +191,7 @@ impl Client for ClientImpl {
                     {
                         Ok(r) => res = r,
                         Err(err) => {
-                            return Err(error::Error::new(
-                                ErrorKind::Network,
-                                err,
-                            ))
+                            return Err(Error::new(ErrorKind::Network, err))
                         }
                     }
 
@@ -268,15 +249,15 @@ struct GetTokenResponse {
     access_token: String,
 }
 
-async fn check_submit_response(res: reqwest::Response) -> error::Result<()> {
+async fn check_submit_response(res: reqwest::Response) -> Result<()> {
     if res.status() != reqwest::StatusCode::OK {
         log::error!("Authentication failed with status {}.", res.status());
 
-        return Err(error::Error::from(ErrorKind::Reddit));
+        return Err(Error::from(ErrorKind::Reddit));
     }
 
     match res.text().await {
-        Err(err) => return Err(error::Error::new(ErrorKind::Network, err)),
+        Err(err) => return Err(Error::new(ErrorKind::Network, err)),
         Ok(text) => {
             log::debug!("{}", text);
 
@@ -284,14 +265,17 @@ async fn check_submit_response(res: reqwest::Response) -> error::Result<()> {
                 Ok(res) => {
                     if !res.success {
                         log::error!("Submit failed.");
-                        return Err(error::Error::from(ErrorKind::Reddit));
+                        return Err(Error::new(
+                            ErrorKind::Reddit,
+                            "failed to submit",
+                        ));
                     }
 
                     log::info!("Submit OK.");
                 }
                 Err(err) => {
                     log::error!("Could not deserialize response");
-                    return Err(error::Error::new(ErrorKind::Reddit, err));
+                    return Err(Error::new(ErrorKind::Reddit, err));
                 }
             }
         }
