@@ -1,5 +1,6 @@
 use std::fs;
 
+use async_trait::async_trait;
 use url;
 
 use crate::client;
@@ -7,12 +8,19 @@ use crate::error::{Error, ErrorKind, Result};
 use crate::reddit;
 use crate::settings;
 
-pub trait App {
-    fn regreddit(&mut self, p: RegredditParams) -> Result<RegredditResult>;
-    fn submit_link(&mut self, p: SubmitLinkParams) -> Result<SubmitLinkResult>;
-    fn submit_self_post(
+#[async_trait]
+pub trait App: Send {
+    async fn regreddit(
         &mut self,
-        p: SubmitSelfPostParams,
+        p: &RegredditParams<'_>,
+    ) -> Result<RegredditResult>;
+    async fn submit_link(
+        &mut self,
+        p: &SubmitLinkParams<'_>,
+    ) -> Result<SubmitLinkResult>;
+    async fn submit_self_post(
+        &mut self,
+        p: &SubmitSelfPostParams<'_>,
     ) -> Result<SubmitSelfPostResult>;
 }
 
@@ -30,23 +38,36 @@ impl<'a> AppImpl<'a> {
     }
 }
 
+#[async_trait]
 impl App for AppImpl<'_> {
-    fn regreddit(&mut self, p: RegredditParams) -> Result<RegredditResult> {
+    async fn regreddit(
+        &mut self,
+        p: &RegredditParams<'_>,
+    ) -> Result<RegredditResult> {
         eprintln!("Nuking your Reddit...");
 
-        let _ = self.client.basic_auth(client::BasicAuthParams {
-            credentials: p.credentials,
-        })?;
+        let _ = self
+            .client
+            .basic_auth(&client::BasicAuthParams {
+                credentials: p.credentials,
+            })
+            .await?;
 
         Ok(RegredditResult {})
     }
 
-    fn submit_link(&mut self, p: SubmitLinkParams) -> Result<SubmitLinkResult> {
+    async fn submit_link(
+        &mut self,
+        p: &SubmitLinkParams<'_>,
+    ) -> Result<SubmitLinkResult> {
         log::info!("Authenticating with Reddit...");
 
-        let _ = self.client.basic_auth(client::BasicAuthParams {
-            credentials: p.credentials,
-        })?;
+        let _ = self
+            .client
+            .basic_auth(&client::BasicAuthParams {
+                credentials: p.credentials,
+            })
+            .await?;
 
         log::info!("Authentication successful.");
         log::info!("Parsing URL...");
@@ -64,26 +85,32 @@ impl App for AppImpl<'_> {
 
         log::info!("Submitting link to r/{}...", p.subreddit);
 
-        let _ = self.client.submit(client::SubmitParams {
-            post: reddit::Post::Link {
-                subreddit: p.subreddit.to_string(),
-                title: p.title.to_string(),
-                url,
-            },
-        })?;
+        let _ = self
+            .client
+            .submit(&client::SubmitParams {
+                post: reddit::Post::Link {
+                    subreddit: p.subreddit.to_string(),
+                    title: p.title.to_string(),
+                    url,
+                },
+            })
+            .await?;
 
         Ok(SubmitLinkResult {})
     }
 
-    fn submit_self_post(
+    async fn submit_self_post(
         &mut self,
-        p: SubmitSelfPostParams,
+        p: &SubmitSelfPostParams<'_>,
     ) -> Result<SubmitSelfPostResult> {
         log::info!("Authenticating with Reddit...");
 
-        let _ = self.client.basic_auth(client::BasicAuthParams {
-            credentials: p.credentials,
-        })?;
+        let _ = self
+            .client
+            .basic_auth(&client::BasicAuthParams {
+                credentials: p.credentials,
+            })
+            .await?;
 
         log::info!("Authentication successful.");
         log::info!("Submitting self-post to r/{}...", p.subreddit);
@@ -139,7 +166,7 @@ impl App for AppImpl<'_> {
             }
         }
 
-        let _ = self.client.submit(submit_params)?;
+        let _ = self.client.submit(&submit_params).await?;
 
         Ok(SubmitSelfPostResult {})
     }

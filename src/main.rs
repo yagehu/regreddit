@@ -19,7 +19,8 @@ static NAME: &str = "regreddit";
 static VERSION: &str = "v0.1.0";
 static AUTHOR_REDDIT_USERNAME: &str = "trustyhardware";
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let matches = clap::App::new("regreddit")
         .version(VERSION)
         .about("Nuke your Reddit account.")
@@ -109,12 +110,15 @@ fn main() {
 
     if let Some(matches) = matches.subcommand_matches("submit") {
         if let Some(matches) = matches.subcommand_matches("link") {
-            match app.submit_link(app::SubmitLinkParams {
-                credentials: &settings.credentials,
-                subreddit: matches.value_of("subreddit").unwrap(),
-                title: matches.value_of("title").unwrap(),
-                url: matches.value_of("url").unwrap(),
-            }) {
+            match app
+                .submit_link(&app::SubmitLinkParams {
+                    credentials: &settings.credentials,
+                    subreddit: matches.value_of("subreddit").unwrap(),
+                    title: matches.value_of("title").unwrap(),
+                    url: matches.value_of("url").unwrap(),
+                })
+                .await
+            {
                 Ok(_res) => process::exit(0),
                 Err(err) => {
                     eprintln!("{}", err);
@@ -124,15 +128,18 @@ fn main() {
         }
 
         if let Some(matches) = matches.subcommand_matches("self-post") {
-            match app.submit_self_post(app::SubmitSelfPostParams {
-                credentials: &settings.credentials,
-                subreddit: matches.value_of("subreddit").unwrap(),
-                title: matches.value_of("title").unwrap(),
-                text: matches.value_of("text"),
-                text_file: matches.value_of("text-file"),
-                richtext_json: matches.value_of("richtext-json"),
-                richtext_json_file: matches.value_of("richtext-json-file"),
-            }) {
+            match app
+                .submit_self_post(&app::SubmitSelfPostParams {
+                    credentials: &settings.credentials,
+                    subreddit: matches.value_of("subreddit").unwrap(),
+                    title: matches.value_of("title").unwrap(),
+                    text: matches.value_of("text"),
+                    text_file: matches.value_of("text-file"),
+                    richtext_json: matches.value_of("richtext-json"),
+                    richtext_json_file: matches.value_of("richtext-json-file"),
+                })
+                .await
+            {
                 Ok(_res) => process::exit(0),
                 Err(err) => {
                     eprintln!("{}", err);
@@ -147,9 +154,12 @@ fn main() {
         process::exit(1);
     }
 
-    match app.regreddit(RegredditParams {
-        credentials: &settings.credentials,
-    }) {
+    match app
+        .regreddit(&RegredditParams {
+            credentials: &settings.credentials,
+        })
+        .await
+    {
         Ok(_) => eprintln!("Successfully nuked your Reddit account."),
         Err(err) => {
             eprintln!("Error {:?}", err);
