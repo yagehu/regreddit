@@ -34,17 +34,9 @@ impl App for AppImpl<'_> {
     fn regreddit(&mut self, p: RegredditParams) -> Result<RegredditResult> {
         eprintln!("Nuking your Reddit...");
 
-        let res = self.client.basic_auth(client::BasicAuthParams {
+        let _ = self.client.basic_auth(client::BasicAuthParams {
             credentials: p.credentials,
         })?;
-
-        eprintln!("{:?}", res);
-
-        let res = self.client.get_posts(client::GetPostsParams {
-            username: &p.credentials.username,
-        })?;
-
-        eprintln!("{:?}", res);
 
         Ok(RegredditResult {})
     }

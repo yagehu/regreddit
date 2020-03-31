@@ -9,7 +9,6 @@ use crate::settings;
 
 pub trait Client {
     fn basic_auth(&mut self, p: BasicAuthParams) -> Result<BasicAuthResult>;
-    fn get_posts(&self, p: GetPostsParams) -> Result<GetPostsResult>;
     fn submit(&self, p: SubmitParams) -> Result<SubmitResult>;
 }
 
@@ -83,14 +82,6 @@ impl Client for ClientImpl {
         })?;
 
         Ok(BasicAuthResult {})
-    }
-
-    fn get_posts(&self, p: GetPostsParams) -> Result<GetPostsResult> {
-        self.http_client.get(&format!(
-            "https://oauth.reddit.com/user/{}/submitted",
-            p.username
-        ));
-        Ok(GetPostsResult {})
     }
 
     fn submit(&self, p: SubmitParams) -> Result<SubmitResult> {
