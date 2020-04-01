@@ -40,7 +40,7 @@ async fn main() {
             clap::Arg::with_name("verbosity")
                 .short("v")
                 .help("The verbosity of logging. Can be repeated `-vvv`")
-                .multiple(true)
+                .multiple(true),
         )
         .subcommand(
             clap::SubCommand::with_name("submit")
@@ -55,7 +55,7 @@ async fn main() {
                             clap::Arg::with_name("url")
                                 .help("The URL to submit.")
                                 .required(true),
-                        )
+                        ),
                 )
                 .subcommand(
                     clap::SubCommand::with_name("self-post")
@@ -64,7 +64,12 @@ async fn main() {
                         .arg(clap::Arg::with_name("title").required(true))
                         .group(
                             clap::ArgGroup::with_name("content")
-                                .args(&["text", "text-file"])
+                                .args(&[
+                                    "text",
+                                    "text-file",
+                                    "richtext-json",
+                                    "richtext-json-file",
+                                ])
                                 .required(true),
                         )
                         .arg(
@@ -76,24 +81,30 @@ async fn main() {
                         .arg(
                             clap::Arg::with_name("text-file")
                                 .long("text-file")
-                                .help("A file containing the body text to submit.")
+                                .help(
+                                    "A file containing the body\
+                                    text to submit.",
+                                )
                                 .takes_value(true),
                         )
                         .arg(
-                            clap::Arg::with_name("richtext_json")
+                            clap::Arg::with_name("richtext-json")
                                 .long("richtext-json")
                                 .help("The body richtext JSON data to submit.")
                                 .takes_value(true),
                         )
                         .arg(
-                            clap::Arg::with_name("richtext_json_file")
+                            clap::Arg::with_name("richtext-json-file")
                                 .long("richtext-json-file")
-                                .help("A file containing richtext JSON data to submit.")
+                                .help(
+                                    "A file containing richtext JSON \
+                                    data to submit.",
+                                )
                                 .takes_value(true),
                         ),
+                ),
         )
-    )
-    .get_matches();
+        .get_matches();
 
     config_logger(matches.occurrences_of("verbosity"));
 
