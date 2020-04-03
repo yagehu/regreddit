@@ -13,6 +13,24 @@ pub enum Post {
     },
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(tag = "kind", content = "data")]
+pub enum Object {
+    Listing {
+        modhash: Option<String>,
+        dist: u64,
+        after: Option<String>,
+        before: Option<String>,
+        children: Vec<Object>,
+    },
+    #[serde(rename = "t3")]
+    Link {
+        subreddit: String,
+        title: String,
+        name: String,
+    },
+}
+
 pub enum SelfPostBody {
     Text(String),
     RichtextJson(String),

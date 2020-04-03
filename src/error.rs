@@ -91,3 +91,9 @@ impl std::convert::From<std::io::Error> for Error {
         Error::new(ErrorKind::Io, err)
     }
 }
+
+impl std::convert::From<reqwest::Error> for Error {
+    fn from(err: reqwest::Error) -> Self {
+        Error::new(ErrorKind::Network, err)
+    }
+}

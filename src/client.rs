@@ -13,6 +13,8 @@ pub trait Client: Send + Sync {
         &mut self,
         p: &BasicAuthParams<'_>,
     ) -> Result<BasicAuthResult>;
+    async fn get_posts(&self, p: &GetPostsParams<'_>)
+        -> Result<GetPostsResult>;
     async fn submit(&self, p: &SubmitParams) -> Result<SubmitResult>;
 }
 
@@ -63,7 +65,7 @@ impl Client for ClientImpl {
         }
 
         if res.status() != reqwest::StatusCode::OK {
-            eprintln!("Authentication failed with status {}.", res.status(),);
+            eprintln!("Authentication failed with status {}.", res.status());
 
             return Err(Error::from(ErrorKind::Authentication));
         }
@@ -74,6 +76,29 @@ impl Client for ClientImpl {
         }
 
         Ok(BasicAuthResult {})
+    }
+
+    async fn get_posts(
+        &self,
+        p: &GetPostsParams<'_>,
+    ) -> Result<GetPostsResult> {
+        log::debug!("Getting posts...");
+
+        let res = self
+            .http_client
+            .get(&format!(
+                "https://oauth.reddit.com/user/{}/submitted",
+                p.username,
+            ))
+            .header("User-Agent", &self.user_agent)
+            .header("Authorization", format!("Bearer {}", self.access_token))
+            .query(&p.listing_control)
+            .send()
+            .await?;
+
+        Ok(GetPostsResult {
+            response: check_response::<reddit::Object>(res).await?,
+        })
     }
 
     async fn submit(&self, p: &SubmitParams) -> Result<SubmitResult> {
@@ -96,8 +121,8 @@ impl Client for ClientImpl {
                         format!("Bearer {}", self.access_token),
                     )
                     .form(&SubmitRequest {
-                        subreddit: subreddit,
-                        title: title,
+                        subreddit,
+                        title,
                         kind: "link".to_string(),
                         url: Some(&url.to_string()),
                         resubmit: true,
@@ -127,8 +152,8 @@ impl Client for ClientImpl {
                     reddit::SelfPostBody::Text(ref text) => {
                         log::info!(r#"Building a "text" self-post request..."#);
                         request = SubmitRequest {
-                            subreddit: subreddit,
-                            title: title,
+                            subreddit,
+                            title,
                             kind: "self".to_string(),
                             url: None,
                             resubmit: true,
@@ -138,8 +163,8 @@ impl Client for ClientImpl {
                     }
                     reddit::SelfPostBody::RichtextJson(ref richtext_json) => {
                         request = SubmitRequest {
-                            subreddit: subreddit,
-                            title: title,
+                            subreddit,
+                            title,
                             kind: "self".to_string(),
                             url: None,
                             resubmit: true,
@@ -187,6 +212,15 @@ pub struct BasicAuthParams<'a> {
 #[derive(Debug)]
 pub struct BasicAuthResult {}
 
+pub struct GetPostsParams<'a> {
+    pub username: &'a str,
+    pub listing_control: &'a ListingControl,
+}
+
+pub struct GetPostsResult {
+    pub response: reddit::Object,
+}
+
 pub struct SubmitParams {
     pub post: reddit::Post,
 }
@@ -213,6 +247,21 @@ struct SubmitResponse {
 #[derive(Debug, Deserialize)]
 struct GetTokenResponse {
     access_token: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ListingControl {
+    pub after: Option<String>,
+    pub before: Option<String>,
+    pub limit: Option<u32>,
+    pub count: Option<u32>,
+    pub show: Option<ListingShow>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub enum ListingShow {
+    #[serde(rename = "all")]
+    All,
 }
 
 async fn check_submit_response(res: reqwest::Response) -> Result<()> {
@@ -248,4 +297,32 @@ async fn check_submit_response(res: reqwest::Response) -> Result<()> {
     }
 
     Ok(())
+}
+
+async fn check_response<T: serde::de::DeserializeOwned>(
+    res: reqwest::Response,
+) -> Result<T> {
+    if res.status() != reqwest::StatusCode::OK {
+        log::error!(
+            "Reqest returned bad status {}: {}",
+            res.status(),
+            res.text().await?
+        );
+
+        return Err(Error::from(ErrorKind::Reddit));
+    }
+
+    let text = res.text().await?;
+
+    log::debug!("{}", text);
+
+    match serde_json::from_str::<T>(&text) {
+        Ok(res) => {
+            return Ok(res);
+        }
+        Err(err) => {
+            log::error!("Could not deserialize response");
+            return Err(Error::new(ErrorKind::Reddit, err));
+        }
+    }
 }

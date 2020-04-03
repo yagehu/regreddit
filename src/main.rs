@@ -25,7 +25,6 @@ async fn main() {
         .version(VERSION)
         .about("Nuke your Reddit account.")
         .author("Yage Hu <yagehu@qq.com>")
-        .setting(clap::AppSettings::SubcommandRequiredElseHelp)
         .arg(
             clap::Arg::with_name("yes")
                 .long("yes")

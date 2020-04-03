@@ -8,6 +8,8 @@ use crate::error::{Error, ErrorKind, Result};
 use crate::reddit;
 use crate::settings;
 
+const LISTING_LIMIT: u32 = 50;
+
 #[async_trait]
 pub trait App: Send {
     async fn regreddit(
@@ -44,7 +46,7 @@ impl App for AppImpl<'_> {
         &mut self,
         p: &RegredditParams<'_>,
     ) -> Result<RegredditResult> {
-        eprintln!("Nuking your Reddit...");
+        log::info!("Nuking your Reddit...");
 
         let _ = self
             .client
@@ -52,6 +54,55 @@ impl App for AppImpl<'_> {
                 credentials: p.credentials,
             })
             .await?;
+        let mut after: Option<String> = None;
+        let limit = Some(LISTING_LIMIT);
+
+        loop {
+            log::info!("Getting next page of posts...");
+
+            if let reddit::Object::Listing { children, .. } = self
+                .client
+                .get_posts(&client::GetPostsParams {
+                    username: &"trustyhardware",
+                    listing_control: &client::ListingControl {
+                        after,
+                        before: None,
+                        count: None,
+                        limit,
+                        show: None,
+                    },
+                })
+                .await?
+                .response
+            {
+                if children.len() == 0 {
+                    break;
+                }
+
+                for post in &children {
+                    if let reddit::Object::Link { name, .. } = post {
+                        log::debug!("Post {}.", name);
+                    } else {
+                        log::error!("Got unexpected object. Expected Link.");
+                        continue;
+                    }
+                }
+
+                if children.len() < LISTING_LIMIT as usize {
+                    break;
+                }
+
+                if let Some(reddit::Object::Link { name, .. }) = children.last()
+                {
+                    after = Some(name.clone());
+                } else {
+                    break;
+                }
+            } else {
+                log::error!("Got unexpected object. Expected Listing.");
+                break;
+            }
+        }
 
         Ok(RegredditResult {})
     }
