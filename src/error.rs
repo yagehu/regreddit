@@ -97,3 +97,9 @@ impl std::convert::From<reqwest::Error> for Error {
         Error::new(ErrorKind::Network, err)
     }
 }
+
+impl std::convert::From<url::ParseError> for Error {
+    fn from(err: url::ParseError) -> Self {
+        Error::new(ErrorKind::InvalidInput, err)
+    }
+}

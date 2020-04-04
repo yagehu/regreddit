@@ -151,21 +151,9 @@ impl App for AppImpl {
             })
             .await?
             .access_token;
+        let url = url::Url::parse(&p.url)?;
 
         log::info!("Authentication successful.");
-        log::info!("Parsing URL...");
-
-        let url;
-
-        match url::Url::parse(&p.url) {
-            Ok(u) => url = u,
-            Err(err) => {
-                log::error!("Failed to parse URL: {}", err);
-
-                return Err(Error::new(ErrorKind::InvalidInput, err));
-            }
-        }
-
         log::info!("Submitting link to r/{}...", p.subreddit);
 
         let _ = self
