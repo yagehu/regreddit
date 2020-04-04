@@ -107,14 +107,14 @@ async fn main() {
 
     config_logger(matches.occurrences_of("verbosity"));
 
-    let mut client = ClientImpl::new(client::Params {
+    let client = ClientImpl::new(client::Params {
         user_agent: format!(
             "{}/{} by /u/{}",
             NAME, VERSION, AUTHOR_REDDIT_USERNAME
         ),
     });
-    let mut app = AppImpl::new(Params {
-        client: &mut client,
+    let app = AppImpl::new(Params {
+        client: Box::new(client),
     });
     let settings = Settings::new().unwrap();
 

@@ -10,16 +10,19 @@ use crate::settings;
 #[async_trait]
 pub trait Client: Send + Sync {
     async fn basic_auth(
-        &mut self,
+        &self,
         p: &BasicAuthParams<'_>,
     ) -> Result<BasicAuthResult>;
+    async fn delete_link(
+        &self,
+        p: &DeleteLinkParams<'_>,
+    ) -> Result<DeleteLinkResult>;
     async fn get_posts(&self, p: &GetPostsParams<'_>)
         -> Result<GetPostsResult>;
-    async fn submit(&self, p: &SubmitParams) -> Result<SubmitResult>;
+    async fn submit(&self, p: &SubmitParams<'_>) -> Result<SubmitResult>;
 }
 
 pub struct ClientImpl {
-    access_token: String,
     http_client: reqwest::Client,
     user_agent: String,
 }
@@ -31,7 +34,6 @@ pub struct Params {
 impl ClientImpl {
     pub fn new(p: Params) -> Self {
         ClientImpl {
-            access_token: "".to_string(),
             http_client: reqwest::Client::new(),
             user_agent: p.user_agent,
         }
@@ -41,7 +43,7 @@ impl ClientImpl {
 #[async_trait]
 impl Client for ClientImpl {
     async fn basic_auth(
-        &mut self,
+        &self,
         p: &BasicAuthParams<'_>,
     ) -> Result<BasicAuthResult> {
         let mut form = HashMap::new();
@@ -70,12 +72,33 @@ impl Client for ClientImpl {
             return Err(Error::from(ErrorKind::Authentication));
         }
 
-        match res.json::<GetTokenResponse>().await {
-            Ok(res) => self.access_token = res.access_token,
+        match res.json::<reddit::GetTokenResponse>().await {
+            Ok(res) => {
+                return Ok(BasicAuthResult {
+                    access_token: res.access_token,
+                })
+            }
             Err(err) => return Err(Error::new(ErrorKind::Authentication, err)),
         }
+    }
 
-        Ok(BasicAuthResult {})
+    async fn delete_link(
+        &self,
+        p: &DeleteLinkParams<'_>,
+    ) -> Result<DeleteLinkResult> {
+        log::debug!("Deleting link...");
+
+        let res = self
+            .http_client
+            .post("https://oauth.reddit.com/api/del")
+            .header("User-Agent", &self.user_agent)
+            .header("Authorization", format!("Bearer {}", p.access_token))
+            .form(&reddit::DeleteRequestForm { id: p.id })
+            .send()
+            .await?;
+        let _res = check_response::<reddit::DeleteResponse>(res).await?;
+
+        Ok(DeleteLinkResult {})
     }
 
     async fn get_posts(
@@ -91,7 +114,7 @@ impl Client for ClientImpl {
                 p.username,
             ))
             .header("User-Agent", &self.user_agent)
-            .header("Authorization", format!("Bearer {}", self.access_token))
+            .header("Authorization", format!("Bearer {}", p.access_token))
             .query(&p.listing_control)
             .send()
             .await?;
@@ -101,7 +124,7 @@ impl Client for ClientImpl {
         })
     }
 
-    async fn submit(&self, p: &SubmitParams) -> Result<SubmitResult> {
+    async fn submit(&self, p: &SubmitParams<'_>) -> Result<SubmitResult> {
         match &p.post {
             reddit::Post::Link {
                 ref subreddit,
@@ -110,17 +133,15 @@ impl Client for ClientImpl {
             } => {
                 log::info!("Making POST request to Reddit...");
 
-                let res;
-
-                match self
+                let res = self
                     .http_client
                     .post("https://oauth.reddit.com/api/submit")
                     .header("User-Agent", &self.user_agent)
                     .header(
                         "Authorization",
-                        format!("Bearer {}", self.access_token),
+                        format!("Bearer {}", p.access_token),
                     )
-                    .form(&SubmitRequest {
+                    .form(&reddit::SubmitRequest {
                         subreddit,
                         title,
                         kind: "link".to_string(),
@@ -130,15 +151,16 @@ impl Client for ClientImpl {
                         richtext_json: None,
                     })
                     .send()
-                    .await
-                {
-                    Ok(r) => res = r,
-                    Err(err) => {
-                        return Err(Error::new(ErrorKind::Network, err))
-                    }
+                    .await?;
+                let res = check_response::<reddit::SubmitResponse>(res).await?;
+
+                if !res.success {
+                    return Err(Error::new(
+                        ErrorKind::Reddit,
+                        "submit unsuccessful",
+                    ));
                 }
 
-                check_submit_response(res).await?;
                 log::info!("Successfully submitted a link.");
             }
             reddit::Post::SelfPost {
@@ -151,7 +173,7 @@ impl Client for ClientImpl {
                 match body {
                     reddit::SelfPostBody::Text(ref text) => {
                         log::info!(r#"Building a "text" self-post request..."#);
-                        request = SubmitRequest {
+                        request = reddit::SubmitRequest {
                             subreddit,
                             title,
                             kind: "self".to_string(),
@@ -162,7 +184,7 @@ impl Client for ClientImpl {
                         }
                     }
                     reddit::SelfPostBody::RichtextJson(ref richtext_json) => {
-                        request = SubmitRequest {
+                        request = reddit::SubmitRequest {
                             subreddit,
                             title,
                             kind: "self".to_string(),
@@ -174,30 +196,29 @@ impl Client for ClientImpl {
                     }
                 }
 
-                let res;
+                log::debug!("Making POST request to Reddit...");
 
-                log::info!("Making POST request to Reddit...");
-
-                match self
+                let res = self
                     .http_client
                     .post("https://oauth.reddit.com/api/submit")
                     .header("User-Agent", &self.user_agent)
                     .header(
                         "Authorization",
-                        format!("Bearer {}", self.access_token),
+                        format!("Bearer {}", p.access_token),
                     )
                     .form(&request)
                     .send()
-                    .await
-                {
-                    Ok(r) => res = r,
-                    Err(err) => {
-                        return Err(Error::new(ErrorKind::Network, err))
-                    }
+                    .await?;
+                let res = check_response::<reddit::SubmitResponse>(res).await?;
+
+                if !res.success {
+                    return Err(Error::new(
+                        ErrorKind::Reddit,
+                        "submit unsuccessful",
+                    ));
                 }
 
-                check_submit_response(res).await?;
-                log::info!("Successfully submitted a self-post.");
+                log::debug!("Successfully submitted a self-post.");
             }
         }
 
@@ -210,94 +231,33 @@ pub struct BasicAuthParams<'a> {
 }
 
 #[derive(Debug)]
-pub struct BasicAuthResult {}
+pub struct BasicAuthResult {
+    pub access_token: String,
+}
+
+pub struct DeleteLinkParams<'a> {
+    pub access_token: &'a str,
+    pub id: &'a str,
+}
+
+pub struct DeleteLinkResult {}
 
 pub struct GetPostsParams<'a> {
+    pub access_token: &'a str,
     pub username: &'a str,
-    pub listing_control: &'a ListingControl,
+    pub listing_control: &'a reddit::ListingControl,
 }
 
 pub struct GetPostsResult {
     pub response: reddit::Object,
 }
 
-pub struct SubmitParams {
+pub struct SubmitParams<'a> {
+    pub access_token: &'a str,
     pub post: reddit::Post,
 }
 
 pub struct SubmitResult {}
-
-#[derive(Debug, Serialize)]
-struct SubmitRequest<'a> {
-    #[serde(rename(serialize = "sr"))]
-    subreddit: &'a str,
-    title: &'a str,
-    kind: String,
-    url: Option<&'a str>,
-    resubmit: bool,
-    text: Option<&'a str>,
-    richtext_json: Option<&'a str>,
-}
-
-#[derive(Deserialize)]
-struct SubmitResponse {
-    success: bool,
-}
-
-#[derive(Debug, Deserialize)]
-struct GetTokenResponse {
-    access_token: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ListingControl {
-    pub after: Option<String>,
-    pub before: Option<String>,
-    pub limit: Option<u32>,
-    pub count: Option<u32>,
-    pub show: Option<ListingShow>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub enum ListingShow {
-    #[serde(rename = "all")]
-    All,
-}
-
-async fn check_submit_response(res: reqwest::Response) -> Result<()> {
-    if res.status() != reqwest::StatusCode::OK {
-        log::error!("Authentication failed with status {}.", res.status());
-
-        return Err(Error::from(ErrorKind::Reddit));
-    }
-
-    match res.text().await {
-        Err(err) => return Err(Error::new(ErrorKind::Network, err)),
-        Ok(text) => {
-            log::debug!("{}", text);
-
-            match serde_json::from_str::<SubmitResponse>(&text) {
-                Ok(res) => {
-                    if !res.success {
-                        log::error!("Submit failed.");
-                        return Err(Error::new(
-                            ErrorKind::Reddit,
-                            "failed to submit",
-                        ));
-                    }
-
-                    log::info!("Submit OK.");
-                }
-                Err(err) => {
-                    log::error!("Could not deserialize response");
-                    return Err(Error::new(ErrorKind::Reddit, err));
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
 
 async fn check_response<T: serde::de::DeserializeOwned>(
     res: reqwest::Response,

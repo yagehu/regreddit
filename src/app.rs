@@ -1,4 +1,5 @@
 use std::fs;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use url;
@@ -13,49 +14,53 @@ const LISTING_LIMIT: u32 = 50;
 #[async_trait]
 pub trait App: Send {
     async fn regreddit(
-        &mut self,
+        &self,
         p: &RegredditParams<'_>,
     ) -> Result<RegredditResult>;
     async fn submit_link(
-        &mut self,
+        &self,
         p: &SubmitLinkParams<'_>,
     ) -> Result<SubmitLinkResult>;
     async fn submit_self_post(
-        &mut self,
+        &self,
         p: &SubmitSelfPostParams<'_>,
     ) -> Result<SubmitSelfPostResult>;
 }
 
-pub struct AppImpl<'a> {
-    client: &'a mut dyn client::Client,
+pub struct AppImpl {
+    client: Arc<Box<dyn client::Client>>,
 }
 
-pub struct Params<'a> {
-    pub client: &'a mut dyn client::Client,
+pub struct Params {
+    pub client: Box<dyn client::Client>,
 }
 
-impl<'a> AppImpl<'a> {
-    pub fn new(p: Params<'a>) -> Self {
-        AppImpl { client: p.client }
+impl AppImpl {
+    pub fn new(p: Params) -> Self {
+        AppImpl {
+            client: Arc::new(p.client),
+        }
     }
 }
 
 #[async_trait]
-impl App for AppImpl<'_> {
+impl App for AppImpl {
     async fn regreddit(
-        &mut self,
+        &self,
         p: &RegredditParams<'_>,
     ) -> Result<RegredditResult> {
         log::info!("Nuking your Reddit...");
 
-        let _ = self
+        let res = self
             .client
             .basic_auth(&client::BasicAuthParams {
                 credentials: p.credentials,
             })
             .await?;
-        let mut after: Option<String> = None;
+        let access_token = res.access_token.clone();
         let limit = Some(LISTING_LIMIT);
+        let mut after: Option<String> = None;
+        let mut handles = Vec::new();
 
         loop {
             log::info!("Getting next page of posts...");
@@ -63,8 +68,9 @@ impl App for AppImpl<'_> {
             if let reddit::Object::Listing { children, .. } = self
                 .client
                 .get_posts(&client::GetPostsParams {
+                    access_token: &access_token,
                     username: &"trustyhardware",
-                    listing_control: &client::ListingControl {
+                    listing_control: &reddit::ListingControl {
                         after,
                         before: None,
                         count: None,
@@ -81,7 +87,28 @@ impl App for AppImpl<'_> {
 
                 for post in &children {
                     if let reddit::Object::Link { name, .. } = post {
-                        log::debug!("Post {}.", name);
+                        let access_token = access_token.clone();
+                        let client = self.client.clone();
+                        let name = name.clone();
+
+                        handles.push(tokio::spawn(async move {
+                            match client
+                                .delete_link(&client::DeleteLinkParams {
+                                    access_token: &access_token,
+                                    id: &name,
+                                })
+                                .await
+                            {
+                                Ok(_res) => {
+                                    log::info!("Deleted post {}.", name);
+                                }
+                                Err(err) => log::warn!(
+                                    "Failed to delete {}: {}.",
+                                    name,
+                                    err
+                                ),
+                            }
+                        }));
                     } else {
                         log::error!("Got unexpected object. Expected Link.");
                         continue;
@@ -104,21 +131,26 @@ impl App for AppImpl<'_> {
             }
         }
 
+        for handle in handles {
+            let _ = handle.await;
+        }
+
         Ok(RegredditResult {})
     }
 
     async fn submit_link(
-        &mut self,
+        &self,
         p: &SubmitLinkParams<'_>,
     ) -> Result<SubmitLinkResult> {
         log::info!("Authenticating with Reddit...");
 
-        let _ = self
+        let access_token = &self
             .client
             .basic_auth(&client::BasicAuthParams {
                 credentials: p.credentials,
             })
-            .await?;
+            .await?
+            .access_token;
 
         log::info!("Authentication successful.");
         log::info!("Parsing URL...");
@@ -139,6 +171,7 @@ impl App for AppImpl<'_> {
         let _ = self
             .client
             .submit(&client::SubmitParams {
+                access_token,
                 post: reddit::Post::Link {
                     subreddit: p.subreddit.to_string(),
                     title: p.title.to_string(),
@@ -151,26 +184,27 @@ impl App for AppImpl<'_> {
     }
 
     async fn submit_self_post(
-        &mut self,
+        &self,
         p: &SubmitSelfPostParams<'_>,
     ) -> Result<SubmitSelfPostResult> {
         log::info!("Authenticating with Reddit...");
 
-        let _ = self
+        let access_token = &self
             .client
             .basic_auth(&client::BasicAuthParams {
                 credentials: p.credentials,
             })
-            .await?;
+            .await?
+            .access_token;
+        let submit_params: client::SubmitParams;
 
         log::info!("Authentication successful.");
         log::info!("Submitting self-post to r/{}...", p.subreddit);
 
-        let submit_params: client::SubmitParams;
-
         match (p.text, p.text_file, p.richtext_json, p.richtext_json_file) {
             (Some(t), None, None, None) => {
                 submit_params = client::SubmitParams {
+                    access_token,
                     post: reddit::Post::SelfPost {
                         subreddit: p.subreddit.to_string(),
                         title: p.title.to_string(),
@@ -180,6 +214,7 @@ impl App for AppImpl<'_> {
             }
             (None, Some(f), None, None) => {
                 submit_params = client::SubmitParams {
+                    access_token,
                     post: reddit::Post::SelfPost {
                         subreddit: p.subreddit.to_string(),
                         title: p.title.to_string(),
@@ -191,6 +226,7 @@ impl App for AppImpl<'_> {
             }
             (None, None, Some(r), None) => {
                 submit_params = client::SubmitParams {
+                    access_token,
                     post: reddit::Post::SelfPost {
                         subreddit: p.subreddit.to_string(),
                         title: p.title.to_string(),
@@ -200,6 +236,7 @@ impl App for AppImpl<'_> {
             }
             (None, None, None, Some(f)) => {
                 submit_params = client::SubmitParams {
+                    access_token,
                     post: reddit::Post::SelfPost {
                         subreddit: p.subreddit.to_string(),
                         title: p.title.to_string(),
