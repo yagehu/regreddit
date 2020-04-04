@@ -151,7 +151,6 @@ impl App for AppImpl {
             })
             .await?
             .access_token;
-        let url = url::Url::parse(&p.url)?;
 
         log::info!("Authentication successful.");
         log::info!("Submitting link to r/{}...", p.subreddit);
@@ -163,7 +162,7 @@ impl App for AppImpl {
                 post: reddit::Post::Link {
                     subreddit: p.subreddit.to_string(),
                     title: p.title.to_string(),
-                    url,
+                    url: url::Url::parse(&p.url)?,
                 },
             })
             .await?;
