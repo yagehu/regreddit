@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use tokio::join;
-use url;
 
 use crate::client;
 use crate::error::{Error, ErrorKind, Result};

@@ -1,5 +1,3 @@
-use url;
-
 #[derive(Serialize)]
 pub(crate) struct DeleteRequestForm<'a> {
     pub id: &'a str,

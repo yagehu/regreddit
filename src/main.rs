@@ -9,8 +9,6 @@ extern crate serde_derive;
 
 use std::process;
 
-use clap;
-
 use crate::app::{App, AppImpl, Params, RegredditParams};
 use crate::client::ClientImpl;
 use crate::settings::Settings;

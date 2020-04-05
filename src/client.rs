@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use reqwest;
 
 use crate::error::{Error, ErrorKind, Result};
 use crate::reddit;
