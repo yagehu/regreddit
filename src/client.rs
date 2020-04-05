@@ -77,12 +77,10 @@ impl Client for ClientImpl {
         }
 
         match res.json::<reddit::GetTokenResponse>().await {
-            Ok(res) => {
-                return Ok(BasicAuthResult {
-                    access_token: res.access_token,
-                })
-            }
-            Err(err) => return Err(Error::new(ErrorKind::Authentication, err)),
+            Ok(res) => Ok(BasicAuthResult {
+                access_token: res.access_token,
+            }),
+            Err(err) => Err(Error::new(ErrorKind::Authentication, err)),
         }
     }
 
@@ -314,12 +312,10 @@ async fn check_response<T: serde::de::DeserializeOwned>(
     log::debug!("{}", text);
 
     match serde_json::from_str::<T>(&text) {
-        Ok(res) => {
-            return Ok(res);
-        }
+        Ok(res) => Ok(res),
         Err(err) => {
             log::error!("Could not deserialize response");
-            return Err(Error::new(ErrorKind::Reddit, err));
+            Err(Error::new(ErrorKind::Reddit, err))
         }
     }
 }
