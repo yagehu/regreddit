@@ -17,6 +17,10 @@ pub trait Client: Send + Sync {
         &self,
         p: &DeleteLinkParams<'_>,
     ) -> Result<DeleteLinkResult>;
+    async fn get_comments(
+        &self,
+        p: &GetCommentsParams<'_>,
+    ) -> Result<GetCommentsResult>;
     async fn get_posts(&self, p: &GetPostsParams<'_>)
         -> Result<GetPostsResult>;
     async fn submit(&self, p: &SubmitParams<'_>) -> Result<SubmitResult>;
@@ -99,6 +103,29 @@ impl Client for ClientImpl {
         let _res = check_response::<reddit::DeleteResponse>(res).await?;
 
         Ok(DeleteLinkResult {})
+    }
+
+    async fn get_comments(
+        &self,
+        p: &GetCommentsParams<'_>,
+    ) -> Result<GetCommentsResult> {
+        log::debug!("Getting comments...");
+
+        let res = self
+            .http_client
+            .get(&format!(
+                "https://oauth.reddit.com/user/{}/comments",
+                p.username
+            ))
+            .header("User-Agent", &self.user_agent)
+            .header("Authorization", format!("Bearer {}", p.access_token))
+            .query(&p.listing_control)
+            .send()
+            .await?;
+
+        Ok(GetCommentsResult {
+            response: check_response::<reddit::Object>(res).await?,
+        })
     }
 
     async fn get_posts(
@@ -241,6 +268,16 @@ pub struct DeleteLinkParams<'a> {
 }
 
 pub struct DeleteLinkResult {}
+
+pub struct GetCommentsParams<'a> {
+    pub access_token: &'a str,
+    pub username: &'a str,
+    pub listing_control: &'a reddit::ListingControl,
+}
+
+pub struct GetCommentsResult {
+    pub response: reddit::Object,
+}
 
 pub struct GetPostsParams<'a> {
     pub access_token: &'a str,

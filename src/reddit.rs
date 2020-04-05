@@ -30,6 +30,12 @@ pub enum Object {
         before: Option<String>,
         children: Vec<Object>,
     },
+    #[serde(rename = "t1")]
+    Comment {
+        link_title: String,
+        link_id: String,
+        name: String,
+    },
     #[serde(rename = "t3")]
     Link {
         subreddit: String,

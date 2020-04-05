@@ -58,78 +58,10 @@ impl App for AppImpl {
             })
             .await?;
         let access_token = res.access_token.clone();
-        let limit = Some(LISTING_LIMIT);
-        let mut after: Option<String> = None;
         let mut handles = Vec::new();
 
-        loop {
-            log::info!("Getting next page of posts...");
-
-            if let reddit::Object::Listing { children, .. } = self
-                .client
-                .get_posts(&client::GetPostsParams {
-                    access_token: &access_token,
-                    username: &"trustyhardware",
-                    listing_control: &reddit::ListingControl {
-                        after,
-                        before: None,
-                        count: None,
-                        limit,
-                        show: None,
-                    },
-                })
-                .await?
-                .response
-            {
-                if children.len() == 0 {
-                    break;
-                }
-
-                for post in &children {
-                    if let reddit::Object::Link { name, .. } = post {
-                        let access_token = access_token.clone();
-                        let client = self.client.clone();
-                        let name = name.clone();
-
-                        handles.push(tokio::spawn(async move {
-                            match client
-                                .delete_link(&client::DeleteLinkParams {
-                                    access_token: &access_token,
-                                    id: &name,
-                                })
-                                .await
-                            {
-                                Ok(_res) => {
-                                    log::info!("Deleted post {}.", name);
-                                }
-                                Err(err) => log::warn!(
-                                    "Failed to delete {}: {}.",
-                                    name,
-                                    err
-                                ),
-                            }
-                        }));
-                    } else {
-                        log::error!("Got unexpected object. Expected Link.");
-                        continue;
-                    }
-                }
-
-                if children.len() < LISTING_LIMIT as usize {
-                    break;
-                }
-
-                if let Some(reddit::Object::Link { name, .. }) = children.last()
-                {
-                    after = Some(name.clone());
-                } else {
-                    break;
-                }
-            } else {
-                log::error!("Got unexpected object. Expected Listing.");
-                break;
-            }
-        }
+        let _ = self.delete_posts(&access_token, &mut handles).await;
+        let _ = self.delete_comments(&access_token, &mut handles).await;
 
         for handle in handles {
             let _ = handle.await;
@@ -244,6 +176,160 @@ impl App for AppImpl {
         let _ = self.client.submit(&submit_params).await?;
 
         Ok(SubmitSelfPostResult {})
+    }
+}
+
+impl AppImpl {
+    async fn delete_comments(
+        &self,
+        access_token: &str,
+        handles: &mut Vec<tokio::task::JoinHandle<()>>,
+    ) -> Result<()> {
+        let limit = Some(LISTING_LIMIT);
+        let mut after: Option<String> = None;
+
+        loop {
+            log::info!("Getting next page of comments...");
+
+            if let reddit::Object::Listing { children, .. } = self
+                .client
+                .get_comments(&client::GetCommentsParams {
+                    access_token: &access_token,
+                    username: &"trustyhardware",
+                    listing_control: &reddit::ListingControl {
+                        after,
+                        before: None,
+                        count: None,
+                        limit,
+                        show: None,
+                    },
+                })
+                .await?
+                .response
+            {
+                for child in &children {
+                    if let reddit::Object::Comment { name, .. } = child {
+                        let access_token = access_token.to_owned();
+                        let client = self.client.clone();
+                        let name = name.clone();
+
+                        handles.push(tokio::spawn(async move {
+                            match client
+                                .delete_link(&client::DeleteLinkParams {
+                                    access_token: &access_token,
+                                    id: &name,
+                                })
+                                .await
+                            {
+                                Ok(_res) => {
+                                    log::info!("Deleted comment {}.", name);
+                                }
+                                Err(err) => log::warn!(
+                                    "Failed to delete {}: {}.",
+                                    name,
+                                    err
+                                ),
+                            }
+                        }));
+                    } else {
+                        log::error!("Got unexpected object. Expected Link.");
+                        continue;
+                    }
+                }
+
+                if children.len() < LISTING_LIMIT as usize {
+                    break;
+                }
+
+                if let Some(reddit::Object::Link { name, .. }) = children.last()
+                {
+                    after = Some(name.clone());
+                } else {
+                    break;
+                }
+            } else {
+                log::error!("Got unexpected object. Expected Listing.");
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn delete_posts(
+        &self,
+        access_token: &str,
+        handles: &mut Vec<tokio::task::JoinHandle<()>>,
+    ) -> Result<()> {
+        let limit = Some(LISTING_LIMIT);
+        let mut after: Option<String> = None;
+
+        loop {
+            log::info!("Getting next page of posts...");
+
+            if let reddit::Object::Listing { children, .. } = self
+                .client
+                .get_posts(&client::GetPostsParams {
+                    access_token: &access_token,
+                    username: &"trustyhardware",
+                    listing_control: &reddit::ListingControl {
+                        after,
+                        before: None,
+                        count: None,
+                        limit,
+                        show: None,
+                    },
+                })
+                .await?
+                .response
+            {
+                for post in &children {
+                    if let reddit::Object::Link { name, .. } = post {
+                        let access_token = access_token.to_owned();
+                        let client = self.client.clone();
+                        let name = name.clone();
+
+                        handles.push(tokio::spawn(async move {
+                            match client
+                                .delete_link(&client::DeleteLinkParams {
+                                    access_token: &access_token,
+                                    id: &name,
+                                })
+                                .await
+                            {
+                                Ok(_res) => {
+                                    log::info!("Deleted post {}.", name);
+                                }
+                                Err(err) => log::warn!(
+                                    "Failed to delete {}: {}.",
+                                    name,
+                                    err
+                                ),
+                            }
+                        }));
+                    } else {
+                        log::error!("Got unexpected object. Expected Link.");
+                        continue;
+                    }
+                }
+
+                if children.len() < LISTING_LIMIT as usize {
+                    break;
+                }
+
+                if let Some(reddit::Object::Link { name, .. }) = children.last()
+                {
+                    after = Some(name.clone());
+                } else {
+                    break;
+                }
+            } else {
+                log::error!("Got unexpected object. Expected Listing.");
+                break;
+            }
+        }
+
+        Ok(())
     }
 }
 
