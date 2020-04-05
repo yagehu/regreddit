@@ -2,6 +2,7 @@ use std::fs;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use tokio::join;
 use url;
 
 use crate::client;
@@ -58,12 +59,19 @@ impl App for AppImpl {
             })
             .await?;
         let access_token = res.access_token.clone();
-        let mut handles = Vec::new();
+        let mut delete_comment_handles = Vec::new();
+        let mut delete_post_handles = Vec::new();
 
-        let _ = self.delete_posts(&access_token, &mut handles).await;
-        let _ = self.delete_comments(&access_token, &mut handles).await;
+        let (_, _) = join!(
+            self.delete_comments(&access_token, &mut delete_comment_handles),
+            self.delete_posts(&access_token, &mut delete_post_handles),
+        );
 
-        for handle in handles {
+        for handle in delete_comment_handles {
+            let _ = handle.await;
+        }
+
+        for handle in delete_post_handles {
             let _ = handle.await;
         }
 
