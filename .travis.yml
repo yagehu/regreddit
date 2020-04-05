@@ -11,6 +11,7 @@ cache: cargo
 
 before_install:
   - rustup component add clippy
+  - rustup component add clippy --toolchain=nightly || cargo install --git https://github.com/rust-lang/rust-clippy/ --force clippy
 
 script:
   - cargo build --verbose --all
