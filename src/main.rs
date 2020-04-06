@@ -114,7 +114,13 @@ async fn main() {
     let app = AppImpl::new(Params {
         client: Box::new(client),
     });
-    let settings = Settings::new().unwrap();
+    let settings = match Settings::new() {
+        Ok(settings) => settings,
+        Err(err) => {
+            eprintln!("Failed to read settings: {}.", err);
+            process::exit(1);
+        }
+    };
 
     if let Some(matches) = matches.subcommand_matches("submit") {
         if let Some(matches) = matches.subcommand_matches("link") {
