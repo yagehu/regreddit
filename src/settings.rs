@@ -1,12 +1,12 @@
 use config::{Config, ConfigError, File};
 
 #[derive(Debug, Deserialize)]
-pub struct Settings {
+pub(crate) struct Settings {
     pub credentials: Credentials,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Credentials {
+pub(crate) struct Credentials {
     pub client_id: String,
     pub secret: String,
     pub username: String,
@@ -14,7 +14,7 @@ pub struct Credentials {
 }
 
 impl Settings {
-    pub fn new() -> Result<Self, ConfigError> {
+    pub(crate) fn new() -> Result<Self, ConfigError> {
         let mut s = Config::new();
 
         s.merge(File::with_name(".regreddit").required(true))?;

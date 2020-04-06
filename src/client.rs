@@ -7,7 +7,7 @@ use crate::reddit;
 use crate::settings;
 
 #[async_trait]
-pub trait Client: Send + Sync {
+pub(crate) trait Client: Send + Sync {
     async fn basic_auth(
         &self,
         p: &BasicAuthParams<'_>,
@@ -25,17 +25,17 @@ pub trait Client: Send + Sync {
     async fn submit(&self, p: &SubmitParams<'_>) -> Result<SubmitResult>;
 }
 
-pub struct ClientImpl {
+pub(crate) struct ClientImpl {
     http_client: reqwest::Client,
     user_agent: String,
 }
 
-pub struct Params {
+pub(crate) struct Params {
     pub user_agent: String,
 }
 
 impl ClientImpl {
-    pub fn new(p: Params) -> Self {
+    pub(crate) fn new(p: Params) -> Self {
         ClientImpl {
             http_client: reqwest::Client::new(),
             user_agent: p.user_agent,
@@ -250,48 +250,48 @@ impl Client for ClientImpl {
     }
 }
 
-pub struct BasicAuthParams<'a> {
+pub(crate) struct BasicAuthParams<'a> {
     pub credentials: &'a settings::Credentials,
 }
 
 #[derive(Debug)]
-pub struct BasicAuthResult {
+pub(crate) struct BasicAuthResult {
     pub access_token: String,
 }
 
-pub struct DeleteLinkParams<'a> {
+pub(crate) struct DeleteLinkParams<'a> {
     pub access_token: &'a str,
     pub id: &'a str,
 }
 
-pub struct DeleteLinkResult {}
+pub(crate) struct DeleteLinkResult {}
 
-pub struct GetCommentsParams<'a> {
+pub(crate) struct GetCommentsParams<'a> {
     pub access_token: &'a str,
     pub username: &'a str,
     pub listing_control: &'a reddit::ListingControl,
 }
 
-pub struct GetCommentsResult {
+pub(crate) struct GetCommentsResult {
     pub response: reddit::Object,
 }
 
-pub struct GetPostsParams<'a> {
+pub(crate) struct GetPostsParams<'a> {
     pub access_token: &'a str,
     pub username: &'a str,
     pub listing_control: &'a reddit::ListingControl,
 }
 
-pub struct GetPostsResult {
+pub(crate) struct GetPostsResult {
     pub response: reddit::Object,
 }
 
-pub struct SubmitParams<'a> {
+pub(crate) struct SubmitParams<'a> {
     pub access_token: &'a str,
     pub post: reddit::Post,
 }
 
-pub struct SubmitResult {}
+pub(crate) struct SubmitResult {}
 
 async fn check_response<T: serde::de::DeserializeOwned>(
     res: reqwest::Response,

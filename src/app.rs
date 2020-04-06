@@ -12,7 +12,7 @@ use crate::settings;
 const LISTING_LIMIT: u32 = 50;
 
 #[async_trait]
-pub trait App: Send {
+pub(crate) trait App: Send {
     async fn regreddit(
         &self,
         p: &RegredditParams<'_>,
@@ -27,16 +27,16 @@ pub trait App: Send {
     ) -> Result<SubmitSelfPostResult>;
 }
 
-pub struct AppImpl {
+pub(crate) struct AppImpl {
     client: Arc<Box<dyn client::Client>>,
 }
 
-pub struct Params {
+pub(crate) struct Params {
     pub client: Box<dyn client::Client>,
 }
 
 impl AppImpl {
-    pub fn new(p: Params) -> Self {
+    pub(crate) fn new(p: Params) -> Self {
         AppImpl {
             client: Arc::new(p.client),
         }
@@ -340,16 +340,16 @@ impl AppImpl {
     }
 }
 
-pub struct SubmitLinkParams<'a> {
+pub(crate) struct SubmitLinkParams<'a> {
     pub credentials: &'a settings::Credentials,
     pub subreddit: &'a str,
     pub title: &'a str,
     pub url: &'a str,
 }
 
-pub struct SubmitLinkResult {}
+pub(crate) struct SubmitLinkResult {}
 
-pub struct SubmitSelfPostParams<'a> {
+pub(crate) struct SubmitSelfPostParams<'a> {
     pub credentials: &'a settings::Credentials,
     pub subreddit: &'a str,
     pub title: &'a str,
@@ -359,10 +359,10 @@ pub struct SubmitSelfPostParams<'a> {
     pub richtext_json_file: Option<&'a str>,
 }
 
-pub struct SubmitSelfPostResult {}
+pub(crate) struct SubmitSelfPostResult {}
 
-pub struct RegredditParams<'a> {
+pub(crate) struct RegredditParams<'a> {
     pub credentials: &'a settings::Credentials,
 }
 
-pub struct RegredditResult {}
+pub(crate) struct RegredditResult {}

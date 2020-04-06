@@ -2,10 +2,10 @@ use std::error;
 use std::fmt;
 use std::result;
 
-pub type Result<T> = result::Result<T, Error>;
+pub(crate) type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug)]
-pub struct Error {
+pub(crate) struct Error {
     repr: Repr,
 }
 
@@ -21,7 +21,7 @@ struct Custom {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum ErrorKind {
+pub(crate) enum ErrorKind {
     Authentication,
     InvalidInput,
     Network,
@@ -30,7 +30,7 @@ pub enum ErrorKind {
 }
 
 impl Error {
-    pub fn new<E>(kind: ErrorKind, err: E) -> Error
+    pub(crate) fn new<E>(kind: ErrorKind, err: E) -> Error
     where
         E: Into<Box<dyn error::Error + Send + Sync>>,
     {

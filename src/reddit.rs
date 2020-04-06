@@ -4,7 +4,7 @@ pub(crate) struct DeleteRequestForm<'a> {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct ListingControl {
+pub(crate) struct ListingControl {
     pub after: Option<String>,
     pub before: Option<String>,
     pub limit: Option<u32>,
@@ -13,14 +13,14 @@ pub struct ListingControl {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub enum ListingShow {
+pub(crate) enum ListingShow {
     #[serde(rename = "all")]
     All,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", content = "data")]
-pub enum Object {
+pub(crate) enum Object {
     Listing {
         modhash: Option<String>,
         dist: u64,
@@ -42,7 +42,7 @@ pub enum Object {
     },
 }
 
-pub enum Post {
+pub(crate) enum Post {
     Link {
         subreddit: String,
         title: String,
@@ -55,7 +55,7 @@ pub enum Post {
     },
 }
 
-pub enum SelfPostBody {
+pub(crate) enum SelfPostBody {
     Text(String),
     RichtextJson(String),
 }
