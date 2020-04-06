@@ -5,6 +5,12 @@
 Regreddit is a command line tool that can delete everything
 (posts and comments for now) from your Reddit account.
 
+## Install
+
+```
+$ cargo install regreddit
+```
+
 ## Credentials
 
 You need a credentials file `.regreddit.toml` in the current working directory
