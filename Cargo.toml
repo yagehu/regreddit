@@ -6,7 +6,7 @@ edition = "2018"
 readme = "README.md"
 repository = "https://github.com/yagehu/regreddit"
 description = "A command line tool that deletes things from your Reddit account."
-license-file = "COPYING"
+license = "GPL-3.0-or-later"
 keywords = ["cli", "reddit"]
 categories = ["command-line-utilities"]
 
