@@ -48,7 +48,7 @@ $ regreddit --yes -vvv
 
 ## Why
 
-Since USCIS check foreign nationals for crimethink for requiring everyone to
+Since USCIS checks foreign nationals for crimethink by requiring everyone to
 hand over social media accounts, it may be best to sanitize your social media
 starting with Reddit.
 
