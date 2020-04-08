@@ -1,0 +1,8 @@
+whitelist = ["rust", "regreddit_sandbox"]
+
+[credentials]
+client_id = "clientid"
+secret = "secret"
+username = "trustyhardware"
+password = "password"
+

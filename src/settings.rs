@@ -3,6 +3,8 @@ use config::{Config, ConfigError, File};
 #[derive(Debug, Deserialize)]
 pub(crate) struct Settings {
     pub credentials: Credentials,
+    #[serde(default)]
+    pub whitelist: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]

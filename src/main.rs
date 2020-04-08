@@ -170,7 +170,7 @@ async fn main() {
 
     match app
         .regreddit(&RegredditParams {
-            credentials: &settings.credentials,
+            settings: &settings,
         })
         .await
     {
