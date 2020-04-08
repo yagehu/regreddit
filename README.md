@@ -1,6 +1,7 @@
 # Regreddit
 
 [![Crates.io](https://img.shields.io/crates/v/regreddit.svg)](https://crates.io/crates/regreddit)
+[![Docs.rs](https://docs.rs/regreddit/badge.svg)](https://docs.rs/regreddit)
 [![Build Status](https://travis-ci.org/yagehu/regreddit.svg?branch=master)](https://travis-ci.org/yagehu/regreddit)
 
 Regreddit is a command line tool that can delete everything
