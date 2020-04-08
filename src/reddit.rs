@@ -33,6 +33,7 @@ pub(crate) enum Object {
         link_title: String,
         link_id: String,
         name: String,
+        subreddit: String,
     },
     #[serde(rename = "t3")]
     Link {

@@ -1,4 +1,6 @@
+use std::collections::HashSet;
 use std::fs;
+use std::iter::FromIterator;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -54,16 +56,27 @@ impl App for AppImpl {
         let res = self
             .client
             .basic_auth(&client::BasicAuthParams {
-                credentials: p.credentials,
+                credentials: &p.settings.credentials,
             })
             .await?;
         let access_token = res.access_token.clone();
         let mut delete_comment_handles = Vec::new();
         let mut delete_post_handles = Vec::new();
+        let whitelist = HashSet::from_iter(p.settings.whitelist.clone());
+
+        println!("{:?}", whitelist);
 
         let (_, _) = join!(
-            self.delete_comments(&access_token, &mut delete_comment_handles),
-            self.delete_posts(&access_token, &mut delete_post_handles),
+            self.delete_comments(
+                &access_token,
+                &mut delete_comment_handles,
+                &whitelist,
+            ),
+            self.delete_posts(
+                &access_token,
+                &mut delete_post_handles,
+                &whitelist,
+            ),
         );
 
         for handle in delete_comment_handles {
@@ -191,6 +204,7 @@ impl AppImpl {
         &self,
         access_token: &str,
         handles: &mut Vec<tokio::task::JoinHandle<()>>,
+        whitelist: &HashSet<String>,
     ) -> Result<()> {
         let limit = Some(LISTING_LIMIT);
         let mut after: Option<String> = None;
@@ -215,7 +229,18 @@ impl AppImpl {
                 .response
             {
                 for child in &children {
-                    if let reddit::Object::Comment { name, .. } = child {
+                    if let reddit::Object::Comment {
+                        name, subreddit, ..
+                    } = child
+                    {
+                        if whitelist.contains(subreddit) {
+                            log::info!(
+                                "Comment is in whitelisted subreddit. \
+                                Skipping..."
+                            );
+                            continue;
+                        }
+
                         let access_token = access_token.to_owned();
                         let client = self.client.clone();
                         let name = name.clone();
@@ -267,6 +292,7 @@ impl AppImpl {
         &self,
         access_token: &str,
         handles: &mut Vec<tokio::task::JoinHandle<()>>,
+        whitelist: &HashSet<String>,
     ) -> Result<()> {
         let limit = Some(LISTING_LIMIT);
         let mut after: Option<String> = None;
@@ -291,7 +317,17 @@ impl AppImpl {
                 .response
             {
                 for post in &children {
-                    if let reddit::Object::Link { name, .. } = post {
+                    if let reddit::Object::Link {
+                        name, subreddit, ..
+                    } = post
+                    {
+                        if whitelist.contains(subreddit) {
+                            log::info!(
+                                "Post is in whitelisted subreddit. Skipping...",
+                            );
+                            continue;
+                        }
+
                         let access_token = access_token.to_owned();
                         let client = self.client.clone();
                         let name = name.clone();
@@ -362,7 +398,7 @@ pub(crate) struct SubmitSelfPostParams<'a> {
 pub(crate) struct SubmitSelfPostResult {}
 
 pub(crate) struct RegredditParams<'a> {
-    pub credentials: &'a settings::Credentials,
+    pub settings: &'a settings::Settings,
 }
 
 pub(crate) struct RegredditResult {}
