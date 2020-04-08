@@ -46,6 +46,15 @@ You can view the logs by:
 $ regreddit --yes -vvv
 ```
 
+## Config
+
+In the `.regreddit.toml` file, you can also specify a list of whitelisted
+subreddits. Posts and comments from them are not deleted. For example:
+
+```toml
+whitelist = ["rust"]
+```
+
 ## Why
 
 Since USCIS checks foreign nationals for crimethink by requiring everyone to
