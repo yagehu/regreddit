@@ -15,5 +15,6 @@ and this project adheres to
 
 - Feature to whitelist subreddits.
 
+[Unreleased]: https://github.com/yagehu/regreddit/compare/v0.1.2...HEAD
 [0.1.2]: https://github.com/yagehu/regreddit/releases/tag/v0.1.2
 
