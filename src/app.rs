@@ -63,9 +63,6 @@ impl App for AppImpl {
         let mut delete_comment_handles = Vec::new();
         let mut delete_post_handles = Vec::new();
         let whitelist = HashSet::from_iter(p.settings.whitelist.clone());
-
-        println!("{:?}", whitelist);
-
         let (_, _) = join!(
             self.delete_comments(
                 &access_token,
