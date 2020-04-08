@@ -1,6 +1,6 @@
 [package]
 name = "regreddit"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["Yage Hu <yagehu@qq.com>"]
 edition = "2018"
 readme = "README.md"

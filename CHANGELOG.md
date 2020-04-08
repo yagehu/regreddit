@@ -9,12 +9,12 @@ and this project adheres to
 
 ## [Unreleased]
 
-## [0.1.2] - 2020-04-07
+## [0.2.0] - 2020-04-07
 
 ### Added
 
 - Feature to whitelist subreddits.
 
-[Unreleased]: https://github.com/yagehu/regreddit/compare/v0.1.2...HEAD
-[0.1.2]: https://github.com/yagehu/regreddit/releases/tag/v0.1.2
+[Unreleased]: https://github.com/yagehu/regreddit/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/yagehu/regreddit/releases/tag/v0.2.0
 
