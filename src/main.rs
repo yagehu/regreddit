@@ -14,7 +14,7 @@ use crate::client::ClientImpl;
 use crate::settings::Settings;
 
 static NAME: &str = "regreddit";
-static VERSION: &str = "v0.1.1";
+static VERSION: &str = "v0.1.2";
 static AUTHOR_REDDIT_USERNAME: &str = "trustyhardware";
 
 #[tokio::main]
